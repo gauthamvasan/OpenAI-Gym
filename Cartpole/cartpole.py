@@ -20,7 +20,7 @@ env = gym.make('CartPole-v0')
 cart = ACRL(0.97,0,0.1/numTilings,0.01/numTilings,0.7,n)
 
 def loadFeatures(stateVars, featureVector):
-    stateVars = list(stateVars)
+    stateVars = stateVars.tolist()
     stateVars[0] += 1.2
     stateVars[1] += 0.07
     stateVars[0] *= 10
@@ -48,6 +48,7 @@ if __name__ == '__main__':
 			action = env.action_space.sample()
 			print(observation,type(observation),env.action_space.sample())
 			observation, reward, done, info = env.step(action)
+			features = loadFeatures(observation, F)
 			if done:
 				print("Episode finished after {} timesteps".format(t+1))
 				break
