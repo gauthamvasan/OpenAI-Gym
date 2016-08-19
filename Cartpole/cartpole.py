@@ -28,7 +28,7 @@ def loadFeatures(stateVars, featureVector):
     
     loadtiles(featureVector, 0, numTilings, cTable, stateVars)
     return featureVector
-    """ 
+    '''
     As provided in Rich's explanation
            tiles                   ; a provided array for the tile indices to go into
            starting-element        ; first element of "tiles" to be changed (typically 0)
@@ -36,7 +36,7 @@ def loadFeatures(stateVars, featureVector):
            memory-size             ; the number of possible tile indices
            floats                  ; a list of real values making up the input vector
            ints)                   ; list of optional inputs to get different hashings
-    """
+    '''
 
 if __name__ == '__main__':
 	numEpisodes = 200
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 		for t in range(100):
 			env.render()        
 			action = env.action_space.sample()
-			print(observation,type(observation))
+			print(observation,type(observation),env.action_space.sample())
 			observation, reward, done, info = env.step(action)
 			if done:
 				print("Episode finished after {} timesteps".format(t+1))
