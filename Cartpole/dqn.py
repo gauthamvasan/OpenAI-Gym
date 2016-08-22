@@ -87,6 +87,7 @@ def epsilon_greedy_policy(state):
 		return index, scores[index]
 
 def Q_update():
+	print("I'm inside!")
 	states1, actions, rewards, states2, done = mem.sample_batch(batch_size)
 	targets = np.zeros(rewards.size)
 	scores = model.predict_proba(states2,batch_size=32)
