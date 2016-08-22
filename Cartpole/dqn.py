@@ -48,15 +48,15 @@ class replay_memory:
 		self.size = 0
 		self.index = 0
 		self.full = False
-		self.state1_memory = np.zeros(np.concatenate(([capacity], input_shape)))
+		self.state1_memory = np.zeros((capacity, input_shape))
 		self.action_memory = np.zeros(capacity, dtype=np.uint8)
 		self.reward_memory = np.zeros(capacity, dtype=np.uint8)
 		self.done_memory = np.zeros(capacity, dtype=np.uint8)
-		self.state2_memory = np.zeros(np.concatenate(([capacity], input_shape)))
+		self.state2_memory = np.zeros((capacity, input_shape))
 
 	def add_entry(self, state1, action, reward, state2, done):
-		self.state1_memory[self.index, :, :] = state1
-		self.state2_memory[self.index, :, :] = state2
+		self.state1_memory[self.index, :] = state1
+		self.state2_memory[self.index, :] = state2
 		self.action_memory[self.index] = action
 		self.reward_memory[self.index] = reward
 		self.done_memory[self.index] = done
@@ -95,24 +95,28 @@ def Q_update():
 			targets[i] = rewards[i]
 		else:
 			targets[i] = rewards[i] + gamma * scores[i]
+	print(states2.size, targets.size)
+	model.train_on_batch(states2,targets)
 
 
 mem = replay_memory(replay_capacity)
 
 if __name__ == '__main__':
-	numEpisodes = 200
+	numEpisodes = 2000
 	numRuns = 10
 	for i_episode in range(numEpisodes):
 		current_state = env.reset()
+		t = 0
 		while(1):
 			env.render()
 			action = env.action_space.sample()
 			#print(current_state,type(current_state),env.action_space.sample())
 			next_state, reward, done, info = env.step(action)
-			mem.add_entry(current_state, action, reward, next_state)
+			mem.add_entry(current_state, action, reward, next_state, done)
 			if mem.size > batch_size:
 				Q_update()
 			current_state = next_state
+			t += 1
 			if done:
 				print("Episode finished after {} timesteps".format(t+1))
 				break
