@@ -1,3 +1,7 @@
+# The implementation below is for discrete action Actor Critic - We use a softmax/Gibbs distribution for the policy
+# For the critic we use Sarsa lambda
+# On-policy Actor Critic with discrete actions
+
 from pylab import *
 import numpy as np
 import random
@@ -17,7 +21,7 @@ numTilings = 8
 cTableSize = 8192
 cTable = CollisionTable(cTableSize, 'safe')
 F = np.zeros(numTilings)
-n = cTableSize + num_actions
+n = cTableSize
 
 
 class ACRL():
@@ -26,76 +30,81 @@ class ACRL():
         self.alphaV = alphaV
         self.alphaU = alphaU
         self.lmbda = lmbda
+        self.action = 0
 
-        self.ev = np.zeros(n)
-        self.ew = np.zeros(n)
+        self.eu = np.zeros((n,num_actions))
+        self.ew = np.zeros((n,num_actions))
 
-        self.w = np.zeros(n)
-        self.u = np.zeros(n)
+        self.w = np.zeros((n,num_actions))
+        self.u = np.zeros((n,num_actions))
 
         self.delta = 0.0
-        self.R = 0.0
-        self.value = 0.0
-        self.nextValue = 0.0
+        self.q_value = 0.0
+        self.q_nextValue = 0.0
 
-        self.compatibleFeatures = np.zeros(n)
+        self.compatibleFeatures = np.zeros((n,num_actions))
 
     def Value(self,features):
         Val = 0.0
         for index in features:
-            Val += self.w[index]
-        self.value = Val
+            Val += self.w[index,self.action]
+        self.q_value = Val
 
-    def Next_Value(self,features):
+    def Next_Value(self,features,action):
         Val = 0.0
         for index in features:
-            Val += self.w[index]
-        self.nextValue = Val
+            Val += self.w[index,action]
+        self.q_nextValue = Val
 
     def Delta(self, reward):
-        self.delta = reward - self.value
+        self.delta = reward - self.q_value
 
     def Delta_Update(self):
-        self.delta += self.gamma*self.nextValue
+        self.delta += self.gamma*self.q_nextValue
 
     def Trace_Update_Critic(self,features):
-        self.ev = self.gamma*self.lmbda*self.ev
+        self.ew[:,self.action] = self.gamma*self.lmbda*self.ew[:,self.action]
         for index in features:
-            self.ev[index] += 1
+            self.ew[index,self.action] += 1
 
     def Trace_Update_Actor(self):
-        self.ew = self.gamma * self.lmbda * self.ew + self.compatibleFeatures
+        self.eu[:,self.action] = self.gamma * self.lmbda * self.eu[:,self.action]
+        self.eu += self.compatibleFeatures
 
     def Weights_Update_Critic(self):
-        self.w += self.alphaV * self.delta * self.ev
+        self.w[:,self.action]  += self.alphaV * self.delta * self.ew[:,self.action]
 
     def Weights_Update_Actor(self):
-        self.u += self.alphaU * self.delta * self.ew
+        self.u += self.alphaU * self.delta * self.eu
 
-    def Compatible_Features(self, action, action_prob, sample_features):
-        self.compatibleFeatures = np.zeros(n)
-        sample_features_bits = np.zeros((n,num_actions))
+    def Compatible_Features(self, action_prob, features):
+        self.compatibleFeatures = np.zeros((n,num_actions))
         add = 0
         for i in range(num_actions):
-            if i != action:
-                for f in sample_features[i]:
+            sample_features_bits = np.zeros((n, num_actions))
+            if i != self.action:
+                for f in features:
                     sample_features_bits[f,i] = action_prob[i]
-                self.compatibleFeatures -= sample_features_bits[:,i]
+                self.compatibleFeatures -= sample_features_bits
             else:
-                for f in sample_features[i]:
+                for f in features:
                     sample_features_bits[f,i] = 1
-                self.compatibleFeatures += sample_features_bits[:,i]
+                self.compatibleFeatures += sample_features_bits
 
     def getAction(self,action_prob):
-        return np.where(action_prob.cumsum() >= np.random.random())[0][0]
+        self.action = np.where(action_prob.cumsum() >= np.random.random())[0][0]
+        return self.action
 
     def Erase_Traces(self):
-        self.e_mu = np.zeros(n)
-        self.ev = np.zeros(n)
-        self.e_sigma = np.zeros(n)
+        self.e_mu = np.zeros((n,num_actions))
+        self.ev = np.zeros((n,num_actions))
+        self.e_sigma = np.zeros((n,num_actions))
 
 #Initialize Actor - Critic parameters
-cart = ACRL(1,0.1/numTilings,0.01/numTilings,0.7)
+cart = ACRL(1,0.1/numTilings,0.05/numTilings,0.7)
+
+def sample_action(action_prob):
+    return np.where(action_prob.cumsum() >= np.random.random())[0][0]
 
 def loadFeatures(stateVars, featureVector):
     stateVars = stateVars.tolist()
@@ -118,19 +127,14 @@ def loadFeatures(stateVars, featureVector):
 '''
 
 def gibbs_action_sampler(state):
-    sample_states = []
-    sample_features = []
     action_prob = np.zeros(num_actions)  # Action probabilities
     gibbs_den = 0     # gibbs policy denominator
     gibbs_num = []
+    features = loadFeatures(state, F)
     for i in range(num_actions):
-        original_state = copy(state)
-        sample_states.append(original_state.step(i)[0])
-        features = loadFeatures(sample_states[i],F)
-        sample_features.append(F)
         val = 0
         for f in features:
-            val += cart.w[f]
+            val += cart.w[f,i]
         gibbs_num.append(val)
         gibbs_den += math.exp(val)
 
@@ -138,7 +142,7 @@ def gibbs_action_sampler(state):
         prob = math.exp(gibbs_num[i])/gibbs_den
         action_prob[i] = prob
 
-    return action_prob, sample_states, sample_features
+    return action_prob, features
 
 
 if __name__ == '__main__':
@@ -146,23 +150,24 @@ if __name__ == '__main__':
     numRuns = 10
     for i_episode in range(numEpisodes):
         current_state = env.reset()
+        current_features = loadFeatures(current_state,F)
         t = 0
         while 1:
             env.render()
-            action_prob, sample_states, sample_features = gibbs_action_sampler(env)
+            action_prob, current_features = gibbs_action_sampler(current_state)
             action =  cart.getAction(action_prob)
-            current_features = loadFeatures(current_state,F)
             next_state, reward, done, info = env.step(action)
-            next_features = loadFeatures(next_state, F)
+            next_action_prob, next_features = gibbs_action_sampler(next_state)
             cart.Value(current_features)
             cart.Delta(reward)
-            cart.Next_Value(next_features)
+            cart.Next_Value(next_features, sample_action(next_action_prob))
             cart.Delta_Update()
             cart.Trace_Update_Critic(current_features)
             cart.Weights_Update_Critic()
-            cart.Compatible_Features(action,action_prob,sample_features)
+            cart.Compatible_Features(action_prob, current_features)
             cart.Trace_Update_Actor()
             cart.Weights_Update_Actor()
+            current_features = next_features
             t += 1
             if done or t>=200:
                 print("Episode {} finished after {} timesteps".format(i_episode,t+1))
