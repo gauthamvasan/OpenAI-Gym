@@ -17,15 +17,15 @@ num_inputs = 4
 num_actions = 2
 
 #Initialize Hashing Tile Coder
-numTilings = 8
-cTableSize = 8192
+numTilings = 32
+cTableSize = 32768
 cTable = CollisionTable(cTableSize, 'safe')
 F = np.zeros(numTilings)
 n = cTableSize
 
 
 class ACRL():
-    def __init__(self,gamma = 1.0, alphaV = 0.1, alphaU = 0.01, lmbda = 0.75):
+    def __init__(self,gamma = 0.99, alphaV = 0.1, alphaU = 0.01, lmbda = 0.7):
         self.gamma = gamma
         self.alphaV = alphaV
         self.alphaU = alphaU
@@ -63,23 +63,24 @@ class ACRL():
         self.delta += self.gamma*self.q_nextValue
 
     def Trace_Update_Critic(self,features):
-        self.ew[:,self.action] = self.gamma*self.lmbda*self.ew[:,self.action]
+        #self.ew[:,self.action] = self.gamma*self.lmbda*self.ew[:,self.action]
+        self.ew = self.gamma*self.lmbda*self.ew
         for index in features:
             self.ew[index,self.action] += 1
 
     def Trace_Update_Actor(self):
-        self.eu[:,self.action] = self.gamma * self.lmbda * self.eu[:,self.action]
+        self.eu = self.gamma * self.lmbda * self.eu
         self.eu += self.compatibleFeatures
 
     def Weights_Update_Critic(self):
-        self.w[:,self.action]  += self.alphaV * self.delta * self.ew[:,self.action]
+        #self.w[:,self.action]  += self.alphaV * self.delta * self.ew[:,self.action]
+        self.w  += self.alphaV * self.delta * self.ew
 
     def Weights_Update_Actor(self):
         self.u += self.alphaU * self.delta * self.eu
 
     def Compatible_Features(self, action_prob, features):
         self.compatibleFeatures = np.zeros((n,num_actions))
-        add = 0
         for i in range(num_actions):
             sample_features_bits = np.zeros((n, num_actions))
             if i != self.action:
@@ -100,8 +101,6 @@ class ACRL():
         self.ev = np.zeros((n,num_actions))
         self.e_sigma = np.zeros((n,num_actions))
 
-#Initialize Actor - Critic parameters
-cart = ACRL(1,0.1/numTilings,0.05/numTilings,0.7)
 
 def sample_action(action_prob):
     return np.where(action_prob.cumsum() >= np.random.random())[0][0]
@@ -109,9 +108,9 @@ def sample_action(action_prob):
 def loadFeatures(stateVars, featureVector):
     stateVars = stateVars.tolist()
     stateVars[0] += 5.0
-    stateVars[1] += 0.5
+    stateVars[2] += 0.5
     stateVars[0] *= 10
-    stateVars[1] *= 10
+    stateVars[2] *= 10
 
     loadtiles(featureVector, 0, numTilings, cTable, stateVars)
     return featureVector
@@ -134,16 +133,19 @@ def gibbs_action_sampler(state):
     for i in range(num_actions):
         val = 0
         for f in features:
-            val += cart.w[f,i]
+            val += cart.u[f,i]
         gibbs_num.append(val)
         gibbs_den += math.exp(val)
 
     for i in range(num_actions):
-        prob = math.exp(gibbs_num[i])/gibbs_den
+        prob = (math.exp(gibbs_num[i]))/gibbs_den
         action_prob[i] = prob
 
     return action_prob, features
 
+
+#Initialize Actor - Critic parameters
+cart = ACRL(1,0.1/numTilings,0.1/numTilings,0.3)
 
 if __name__ == '__main__':
     numEpisodes = 500
@@ -158,6 +160,7 @@ if __name__ == '__main__':
             action =  cart.getAction(action_prob)
             next_state, reward, done, info = env.step(action)
             next_action_prob, next_features = gibbs_action_sampler(next_state)
+
             cart.Value(current_features)
             cart.Delta(reward)
             cart.Next_Value(next_features, sample_action(next_action_prob))
@@ -167,7 +170,9 @@ if __name__ == '__main__':
             cart.Compatible_Features(action_prob, current_features)
             cart.Trace_Update_Actor()
             cart.Weights_Update_Actor()
-            current_features = next_features
+            #print (action_prob)
+
+            current_state = next_state
             t += 1
             if done or t>=200:
                 print("Episode {} finished after {} timesteps".format(i_episode,t+1))
