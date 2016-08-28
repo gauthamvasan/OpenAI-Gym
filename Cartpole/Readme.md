@@ -11,3 +11,5 @@ CartPole-v0 defines "solving" as getting average reward of 195.0 over 100 consec
 Run the file qlearn_neural_nets.py to train a neural net from scratch for this setting. The network has 4 inputs, two hidden layers
 (with 8 and 16 nodes each) and 2 output nodes (since, we need to calculate Q values for 2 actions). The activations are ReLU for
 the hidden layers and Linear for the output layer. 
+
+The file dqn.py is based on the Deep Q Network paper which trained Atari using RL. It used experience replay and the same network as above
