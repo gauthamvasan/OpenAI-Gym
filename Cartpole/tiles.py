@@ -51,11 +51,11 @@ Useful routines and classes:
 import random 
 import math
 import operator
-
+randomTable_size = 2048
 _maxnumfloats = 20                      # maximum number of variables used in one grid
 _maxLongint = 2147483647                # maximum integer
 _maxLongintBy4 = _maxLongint // 4       # maximum integer divided by 4   
-_randomTable = [random.randrange(_maxLongintBy4) for i in xrange(2048)]   #table of random numbers
+_randomTable = [random.randrange(_maxLongintBy4) for i in xrange(randomTable_size)]   #table of random numbers
 #_randomTable = [random.randrange(65536) for i in xrange(2048)]   #table of random numbers
             
 # The following are temporary variables used by tiles.
@@ -145,7 +145,7 @@ def hashUNH (ints, numInts, m, increment=449):
     "Hashing of array of integers into below m, using random table"
     res = 0
     for i in xrange(numInts):
-        res += _randomTable[(ints[i] + i*increment) % 2048]
+        res += _randomTable[(ints[i] + i*increment) % randomTable_size]
         #res += _randomTable[(ints[i] + i*increment) & 2047] 
 
     #res = reduce(operator.add, [_randomTable[(ints[i] + i*increment) & 2047] for i in xrange(numInts)])
@@ -254,6 +254,7 @@ def tileswrap(numtilings, memctable, floats, wrapwidths, ints=[]):
     if isinstance(memctable, CollisionTable):
         hashfun = hash
     else:
+        print ("Yo!")
         hashfun = hashUNH
 
     numfloats = len(floats)

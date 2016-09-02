@@ -18,7 +18,7 @@ num_actions = 2
 
 #Initialize Hashing Tile Coder
 numTilings = 32
-cTableSize = 32768
+cTableSize = 2**18
 cTable = CollisionTable(cTableSize, 'safe')
 F = np.zeros(numTilings)
 n = cTableSize
@@ -60,11 +60,11 @@ class ACRL():
         self.delta = reward - self.q_value
 
     def Delta_Update(self):
-        self.delta += self.gamma*self.q_nextValue
+        self.delta += self.gamma * self.q_nextValue
 
     def Trace_Update_Critic(self,features):
         #self.ew[:,self.action] = self.gamma*self.lmbda*self.ew[:,self.action]
-        self.ew = self.gamma*self.lmbda*self.ew
+        self.ew = self.gamma * self.lmbda * self.ew
         for index in features:
             self.ew[index,self.action] += 1
 
@@ -81,25 +81,24 @@ class ACRL():
 
     def Compatible_Features(self, action_prob, features):
         self.compatibleFeatures = np.zeros((n,num_actions))
+        for f in features:
+            self.compatibleFeatures[f,self.action] = 1 - action_prob[self.action]
+
         for i in range(num_actions):
             sample_features_bits = np.zeros((n, num_actions))
             if i != self.action:
                 for f in features:
                     sample_features_bits[f,i] = action_prob[i]
                 self.compatibleFeatures -= sample_features_bits
-            else:
-                for f in features:
-                    sample_features_bits[f,i] = 1
-                self.compatibleFeatures += sample_features_bits
+
 
     def getAction(self,action_prob):
         self.action = np.where(action_prob.cumsum() >= np.random.random())[0][0]
         return self.action
 
     def Erase_Traces(self):
-        self.e_mu = np.zeros((n,num_actions))
+        self.ew = np.zeros((n,num_actions))
         self.ev = np.zeros((n,num_actions))
-        self.e_sigma = np.zeros((n,num_actions))
 
 
 def sample_action(action_prob):
@@ -107,10 +106,10 @@ def sample_action(action_prob):
 
 def loadFeatures(stateVars, featureVector):
     stateVars = stateVars.tolist()
-    stateVars[0] += 5.0
-    stateVars[2] += 0.5
-    stateVars[0] *= 10
+    stateVars[0] *= 5
+    stateVars[1] *= 10
     stateVars[2] *= 10
+    stateVars[3] *= 10
 
     loadtiles(featureVector, 0, numTilings, cTable, stateVars)
     return featureVector
@@ -145,25 +144,28 @@ def gibbs_action_sampler(state):
 
 
 #Initialize Actor - Critic parameters
-cart = ACRL(1,0.1/numTilings,0.1/numTilings,0.3)
+cart = ACRL(1,0.1/numTilings,0.01/numTilings,0.3)
 
 if __name__ == '__main__':
-    numEpisodes = 500
+    numEpisodes = 1000
     numRuns = 10
     for i_episode in range(numEpisodes):
         current_state = env.reset()
         current_features = loadFeatures(current_state,F)
+        action_prob, current_features = gibbs_action_sampler(current_state)
+        action = cart.getAction(action_prob)
         t = 0
         while 1:
             env.render()
             action_prob, current_features = gibbs_action_sampler(current_state)
-            action =  cart.getAction(action_prob)
-            next_state, reward, done, info = env.step(action)
+            action = cart.getAction(action_prob)
+            next_state, reward, done, info = env.step(cart.action)
             next_action_prob, next_features = gibbs_action_sampler(next_state)
 
             cart.Value(current_features)
             cart.Delta(reward)
-            cart.Next_Value(next_features, sample_action(next_action_prob))
+            next_action = sample_action(next_action_prob)
+            cart.Next_Value(next_features, next_action)
             cart.Delta_Update()
             cart.Trace_Update_Critic(current_features)
             cart.Weights_Update_Critic()
