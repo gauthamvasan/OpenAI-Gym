@@ -75,7 +75,8 @@ def Q_update():
         else:
             targets[i,actions[i]] = rewards[i] + gamma * np.max(new_Q[i])
         #print(actions[i], targets[i,actions[i]] - old_Q[i,actions[i]])
-    model.train_on_batch(states1,targets)
+    loss = model.train_on_batch(states1,targets)
+    print (loss)
 
 def buffer_func(current_state, action, reward, next_state, done):
     if len(batch_mem) == batch_size:
