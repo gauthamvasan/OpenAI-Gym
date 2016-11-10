@@ -3,6 +3,8 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/Cartpole.iml" filepath="$PROJECT_DIR$/.idea/Cartpole.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../.idea/OpenAI-Gym.iml" filepath="$PROJECT_DIR$/../.idea/OpenAI-Gym.iml" />
+      <module fileurl="file://$USER_HOME$/gym/.idea/gym.iml" filepath="$USER_HOME$/gym/.idea/gym.iml" />
     </modules>
   </component>
 </project>
